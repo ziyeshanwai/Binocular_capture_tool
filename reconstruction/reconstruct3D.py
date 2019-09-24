@@ -27,32 +27,86 @@ def get_AB(Ml, Mr, ul, vl, ur, vr):
     return A, B
 
 
-if __name__ == "__main__":
-    left_img_root_path = r"\\192.168.20.63\ai\Liyou_wang_data\double_cameras_video\imgs\left"
-    right_img_root_path = r"\\192.168.20.63\ai\Liyou_wang_data\double_cameras_video\imgs\right"
-    left_img = cv2.imread(os.path.join(left_img_root_path, "0.jpg"))
-    right_img = cv2.imread(os.path.join(right_img_root_path, "0.jpg"))
-    radius = 10
-    Ml = np.array([[10, 0, 360, 0], [0, 10, 640, 0], [0, 0, 1, 0]], dtype=np.float32)
-    Mr = np.array([[0.3520066989851156, 2.073537362795778, -18.45796152964473, -28.37748590946849],
-                   [2.508549580148226, 2.247961998832718, -13.69927652036192, -43.29439392369385],
-                   [0.00274310953611928, 0.00441668809134959, -0.03340103384464285, -0.0576053978033833]], dtype=np.float32)  # 右侧相机矩阵
-    left_uvs_list = [[185, 186], [271, 199], [366, 201], [467, 191], [536, 201], [152, 265], [508, 280], [316, 321], [279, 540], [255, 665], [287,678],[320,669],[239,723],[291,747],[350,742],[289,846]]
-    right_uvs_list = [[298, 213], [397, 235], [485, 243], [557, 241], [594, 251], [249, 296], [586, 324], [442, 361], [491, 583], [420, 716], [457,722],[481,707],[386,785],[445,791],[489,774],[430,894]]
+def My_triangulatePoints(Ml, Mr, left_uvs_list, right_uvs_list):
+    """
+
+    :param
+    Ml: 左投影矩阵
+    :param
+    Mr: 右侧投影矩阵
+    :param
+    left_uvs_list: 左侧图像像素坐标
+    :param
+    right_uvs_list: 右侧图像像素坐标
+    :return:
+    """
     x_ = []
     for i in range(0, len(left_uvs_list)):
         # A, b = get_AB(Ml, Mr, left_uvs_list[0][0], left_uvs_list[0][1], right_uvs_list[0][0], right_uvs_list[0][1])
-        A_tmp, b_tmp = get_AB(Ml, Mr, left_uvs_list[i][0], left_uvs_list[i][1], right_uvs_list[i][0], right_uvs_list[i][1])
+        A_tmp, b_tmp = get_AB(Ml, Mr, left_uvs_list[i][0], left_uvs_list[i][1], right_uvs_list[i][0],
+                              right_uvs_list[i][1])
         retval, X = cv2.solve(A_tmp, b_tmp, flags=cv2.DECOMP_SVD)
-        print("error is {}".format(A_tmp.dot(X)-b_tmp))
+        print("error is []".format(A_tmp.dot(X) - b_tmp))
         x_.append(X.ravel())
-        # A = np.vstack((A, A_tmp))
-        # b = np.vstack((b, b_tmp))
-    # print("A shape is {}".format(A.shape))
-    # print("b shape is {}".format(b.shape))
+    return x_
 
-    print("retval is {}".format(retval))
-    x_ = np.array(x_, dtype=np.float32)
+
+def cv_triangulatePoints(Ml, Mr, left_uvs_list, right_uvs_list):
+    """
+    cv2 自带的求解3D点
+    :param Ml: 左投影矩阵
+    :param Mr: 右侧投影矩阵
+    :param left_uvs_list: 左侧图像像素坐标
+    :param right_uvs_list: 右侧图像像素坐标
+    :return: 计算出来的3D坐标
+    """
+    x_ = cv2.triangulatePoints(Ml, Mr, np.array(left_uvs_list, dtype=np.float32).T,
+                               np.array(right_uvs_list, dtype=np.float32).T)
+    x_ = x_.T/(x_.T[:, -1][:, np.newaxis])
+    x_ = x_[:, :-1]
+    return x_
+
+
+def caculate_camera_Mat(pts1, pts2):
+    """
+    计算相机矩阵
+    :param pts1:
+    :param pts2:
+    :return: 做鱼连个相机矩阵
+    """
+    F, mask = cv2.findFundamentalMat(pts1, pts2)
+
+    # Now decompose F to R and t using SVD
+    W = np.array([[0, -1, 0],
+                  [1, 0, 0],
+                  [0, 0, 1]])
+    w, u, vt = cv2.SVDecomp(F)
+    R = u * W * vt
+    t = u[:, 2, np.newaxis]
+
+    P1 = np.hstack((R, t))  # Projection matrix of second cam is ready
+
+    P0 = np.array([[1, 0, 0, 0],
+                   [0, 1, 0, 0],
+                   [0, 0, 1, 0]])  # Projection matrix of first cam at origin
+    return P0, P1
+
+
+if __name__ == "__main__":
+    left_img_root_path = r"\\192.168.20.63\ai\Liyou_wang_data\double_cameras_video\imgs\left"
+    right_img_root_path = r"\\192.168.20.63\ai\Liyou_wang_data\double_cameras_video\imgs\right"
+    left_img = cv2.imread(os.path.join(left_img_root_path, "100.jpg"))
+    right_img = cv2.imread(os.path.join(right_img_root_path, "100.jpg"))
+    radius = 10
+    Ml = np.array([[640, 0, 360, 0], [0, 640, 640, 0], [0, 0, 1, 0]], dtype=np.float32)
+    Mr = np.array([[-23096.52209925945, 121.0767469074435, -15479.67020955832, -92.81534872139144],
+                   [-6065.312586815806, -18157.9877783466, -11088.99093381785, 375.8810604672095],
+                   [-17.55229880699845, -4.19159965121192, -13.41794155798649, 0.7852329199736483]], dtype=np.float32)  # 右侧相机矩阵
+    left_uvs_list = [[191,193],[274,183],[355,185],[450,199],[518,206],[140,272],[503,282],[312,305],[274,527],[245,636],[284,650],[325,646],[231,729],[284,753],[349,738],[285,852]]
+    right_uvs_list = [[323,218],[406,213],[482,219],[559,243],[592,254],[263,301],[597,323],[444,343],[492,574],[416,691],[459,700],[490,686],[375,781],[442,787],[490,761],[427,894]]
+
+    x_ = np.array(My_triangulatePoints(Ml, Mr, left_uvs_list, right_uvs_list), dtype=np.float32)  # my own 3d restruction code
+
     fig = plt.figure()
     ax = Axes3D(fig)
     for i in range(0, len(x_)):
@@ -73,6 +127,14 @@ if __name__ == "__main__":
     cv2.imshow('left_image', left_img)
     cv2.imshow('right_image', right_img)
     # cv2.waitKey(0)
+    # visulize face
     ax.scatter(x_[:, 0], x_[:, 1], x_[:, 2])
+    ax.plot(x_[[5, 0, 1, 2, 3, 4, 6], 0], x_[[5, 0, 1, 2, 3, 4, 6], 1], x_[[5, 0, 1, 2, 3, 4, 6], 2], color='r')
+    ax.plot(x_[[1, 7, 2], 0], x_[[1, 7, 2], 1], x_[[1, 7, 2], 2], color='r')
+    ax.plot(x_[[7, 8], 0], x_[[7, 8], 1], x_[[7, 8], 2], color='r')
+    ax.plot(x_[[9, 10, 11], 0], x_[[9, 10, 11], 1], x_[[9, 10, 11], 2], color='r')
+    ax.plot(x_[[12, 13, 14], 0], x_[[12, 13, 14], 1], x_[[12, 13, 14], 2], color='r')
+    ax.plot(x_[[13, 15], 0], x_[[13, 15], 1], x_[[13, 15], 2], color='r')
+
     plt.show()
 
