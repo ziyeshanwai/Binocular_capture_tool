@@ -14,6 +14,7 @@ class SocketCameraThread(threading.Thread):
         self.target_ip = target_ip  # ip
         self.target_port = target_port  # port
         self.tcpCliSock = socket(AF_INET, SOCK_STREAM)
+        self.buffer_size = 4096
 
     def init_connection(self):
         self.connection()
@@ -46,14 +47,12 @@ class SocketCameraThread(threading.Thread):
         receive the message from the server
         :return:
         """
-
         while True:
-            buffer = self.tcpCliSock.recv(BUFSIZ)  # 接收回应消息，接收到的是字节数组
+            buffer = self.tcpCliSock.recv(self.buffer_size)  # 接收回应消息，接收到的是字节数组
             if b'\r\n\r\n' in buffer:
                 if len(buffer.split(b"\r\n\r\n")) > 2:
                     continue
                 else:
-                    start = time.time()
                     header, img_part = buffer.split(b"\r\n\r\n")
                     img_length = int(header.split(b"Content-length: ")[1])
                     while len(img_part) != img_length:
@@ -63,7 +62,7 @@ class SocketCameraThread(threading.Thread):
                         """
                         添加到队列
                         """
-                        self.img_bytes_queue.put(img_part)  ## only add to the queue
+                        self.img_bytes_queue.put(img_part)  # # only add to the queue
 
 
 def decode_img(img_bytes):
