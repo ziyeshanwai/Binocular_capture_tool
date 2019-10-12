@@ -46,7 +46,7 @@ def My_triangulatePoints(Ml, Mr, left_uvs_list, right_uvs_list):
         A_tmp, b_tmp = get_AB(Ml, Mr, left_uvs_list[i][0], left_uvs_list[i][1], right_uvs_list[i][0],
                               right_uvs_list[i][1])
         retval, X = cv2.solve(A_tmp, b_tmp, flags=cv2.DECOMP_SVD)
-        print("error is []".format(A_tmp.dot(X) - b_tmp))
+        # print("error is []".format(A_tmp.dot(X) - b_tmp))
         x_.append(X.ravel())
     return x_
 
@@ -94,6 +94,46 @@ def caculate_camera_Mat(pts1, pts2):
     return P0, P1
 
 
+def draw_3d_points(points_3d):
+    """
+    绘制3d点
+    :param points_3d: numpy file
+    :return:
+    """
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.scatter(points_3d[:, 0], points_3d[:, 1], points_3d[:, 2])
+    plt.show()
+
+
+def projection(M, points_3d):
+    """
+    M:投影矩阵
+    x_: 3D 点 一个
+    根据投影矩阵和3D点计算平面2d点
+    :return:
+    """
+    xw = np.append(points_3d, 1)
+    uv = Ml.dot(xw[:, np.newaxis])
+    uv = uv / uv[2]
+    return uv
+
+
+def show_uv_on_img(img, uv, i):
+    """
+    将uv坐标点绘制在图片上
+    :param img: 输入的图片numpy
+    :param uv: uv坐标
+    :return: 图片
+    """
+    cv2.circle(img, (int(uv[0]), int(uv[1])), radius, (255, 0, 0), 1)
+    cv2.putText(img, "{}".format(i), (int(uvs[0] - radius / 2), int(uvs[1] + radius / 2)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5, (255, 255, 255), lineType=cv2.LINE_AA)
+    return img
+
+
+
 if __name__ == "__main__":
     left_img_root_path = r"\\192.168.20.63\ai\Liyou_wang_data\double_cameras_video\imgs\left"
     right_img_root_path = r"\\192.168.20.63\ai\Liyou_wang_data\double_cameras_video\imgs\right"
@@ -114,19 +154,23 @@ if __name__ == "__main__":
     fig = plt.figure()
     ax = Axes3D(fig)
     for i in range(0, len(x_)):
-        xw = np.append(x_[i], 1)
-        uvs = Ml.dot(xw[:, np.newaxis])
-        uvs = uvs/uvs[2]
-        cv2.circle(left_img, (int(uvs[0]), int(uvs[1])), radius, (255, 0, 0), 1)
-        cv2.putText(left_img, "{}".format(i), (int(uvs[0] - radius / 2), int(uvs[1] + radius / 2)), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (255, 255, 255), lineType=cv2.LINE_AA)
+        # xw = np.append(x_[i], 1)
+        # uvs = Ml.dot(xw[:, np.newaxis])
+        # uvs = uvs/uvs[2]
+        uvs = projection(Ml, x_[i])
+        left_img = show_uv_on_img(left_img, uvs, i)
+        # cv2.circle(left_img, (int(uvs[0]), int(uvs[1])), radius, (255, 0, 0), 1)
+        # cv2.putText(left_img, "{}".format(i), (int(uvs[0] - radius / 2), int(uvs[1] + radius / 2)), cv2.FONT_HERSHEY_SIMPLEX,
+        #             0.5, (255, 255, 255), lineType=cv2.LINE_AA)
         print("left:{} {}".format(i, uvs))
-        uvs = Mr.dot(xw[:, np.newaxis])
-        uvs = uvs / uvs[2]
-        cv2.circle(right_img, (int(uvs[0]), int(uvs[1])), radius, (255, 0, 0), 1)
-        cv2.putText(right_img, "{}".format(i), (int(uvs[0] - radius / 2), int(uvs[1] + radius / 2)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (255, 255, 255), lineType=cv2.LINE_AA)
+        # uvs = Mr.dot(xw[:, np.newaxis])
+        # uvs = uvs / uvs[2]
+        uvs = projection(Mr, x_[i])
+        right_img = show_uv_on_img(right_img, uvs, i)
+        # cv2.circle(right_img, (int(uvs[0]), int(uvs[1])), radius, (255, 0, 0), 1)
+        # cv2.putText(right_img, "{}".format(i), (int(uvs[0] - radius / 2), int(uvs[1] + radius / 2)),
+        #             cv2.FONT_HERSHEY_SIMPLEX,
+        #             0.5, (255, 255, 255), lineType=cv2.LINE_AA)
         print("right:{} {}".format(i, uvs))
     cv2.imshow('left_image', left_img)
     cv2.imshow('right_image', right_img)
