@@ -17,15 +17,17 @@ class SocketCameraThread(threading.Thread):
         self.buffer_size = 4096
 
     def init_connection(self):
+        print("init {}".format(self.threadID))
         self.connection()
-        self.send_message(self.threadID)
+        self.send_message()
+        print("send message {}".format(self.threadID))
 
     def run(self):
         self.init_connection()
-        print("线程 %d 开启" % self.threadID)
+        print("线程 {} 开启".format(self.threadID))
         # TODO
         self.receive_message()
-        print("线程 %d 结束" % self.threadID)
+        print("线程 {} 结束".format(self.threadID))
 
     def connection(self):
         """
@@ -33,7 +35,9 @@ class SocketCameraThread(threading.Thread):
         :return:
         """
         address = (self.target_ip, self.target_port)
-        self.tcpCliSock.connect(address)
+        print("build connection")
+        state = self.tcpCliSock.connect(address)
+        print("{}".format(state))
 
     def send_message(self, str_message):
         """
@@ -80,12 +84,13 @@ if __name__ == '__main__':
     thread_id_1 = "left"
     thread_id_2 = "right"
     target_ip = "192.168.106.80"
-    target_port_1 = "8080"
-    target_port_2 = "8081"
+    target_port_1 = 8080
+    target_port_2 = 8081
     left_camera_client = SocketCameraThread(thread_id_1, target_ip, target_port_1)
     right_camera_client = SocketCameraThread(thread_id_2, target_ip, target_port_2)
     left_camera_client.start()
     right_camera_client.start()
+    print("start..")
     while True:
         if not left_camera_client.img_bytes_queue.empty() and not right_camera_client.img_bytes_queue.empty():
             left_img_bytes = left_camera_client.img_bytes_queue.get()
